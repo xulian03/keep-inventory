@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SERVICE_NAME = "sales"
+DB_PATH = os.getenv("SALES_DB", "sales.db")
 PORT = int(os.getenv("SALES_PORT", "8003"))
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-keep-inventory")
 JWT_EXPIRES_HOURS = 24

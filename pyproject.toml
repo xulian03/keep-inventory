@@ -6,9 +6,10 @@ target-version = "py310"
 select = ["E", "F", "I"]
 
 [tool.pytest.ini_options]
-testpaths = ["services"]
+testpaths = ["services", "scripts/tests"]
 pythonpath = [
     "services/auth/src",
     "services/inventory/src",
     "services/sales/src",
+    "scripts",
 ]

@@ -19,7 +19,8 @@ microservicios REST + frontend React. Prioridad: funcional, simple, demostrable.
 - services/<svc>/src/<paquete>/ : código del servicio (main.py, config.py, luego models/routers).
 - services/<svc>/tests/ : pytest con TestClient.
 - frontend/src/ : páginas (Login, Admin, Empleado), api/, theme.ts.
-- scripts/seed.py : semilla de datos (CSV BigBasket en data/ + historial simulado).
+- scripts/seed.py : semilla de datos (CSV BigBasket en data/ + historial simulado);
+  scripts/tests/ : tests de la semilla (invariants de ledger y calibración).
 - .specs/F-XXX-*.md : specs por feature; fuente de verdad del trabajo.
 - docs/ARCHITECTURE.md : arquitectura completa; fuente del documento de diseño.
 
@@ -34,15 +35,17 @@ microservicios REST + frontend React. Prioridad: funcional, simple, demostrable.
 ## Comandos (PowerShell, desde la raíz)
 - Variables de entorno opcionales (todas con defaults en services/*/src/*/config.py, la
   demo funciona sin .env): JWT_SECRET, AUTH_PORT, INVENTORY_PORT, SALES_PORT,
-  INVENTORY_URL, FRONTEND_URL.
+  INVENTORY_URL, FRONTEND_URL, AUTH_DB, INVENTORY_DB, SALES_DB.
 - Setup Python: python -m venv .venv ; .venv\Scripts\pip install -r requirements.txt
 - Setup frontend: cd frontend ; npm install
 - Lint: .venv\Scripts\ruff check services scripts
-- Tests: .venv\Scripts\pytest services -q
-- Semilla (requiere CSV en data/): .venv\Scripts\python scripts\seed.py
+- Tests: .venv\Scripts\pytest -q (testpaths: services + scripts/tests)
+- Semilla (requiere CSV en data/): .venv\Scripts\python scripts\seed.py (recrea las
+  3 BDs desde cero en la raíz; determinista salvo fechas relativas a hoy)
 - Levantar todo (abre 4 ventanas): .\start-all.ps1
 - Salud: Invoke-WebRequest http://localhost:8001/health (ídem :8002, :8003)
 
 ## Credenciales demo (creadas por la semilla)
 - admin@tienda.com / admin123 (Dueño/Admin)
 - empleado@tienda.com / empleado123 (Empleado/Vendedor)
+- vendedor2@tienda.com / vendedor123 (Empleado/Vendedor)

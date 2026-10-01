@@ -7,7 +7,7 @@ revisión del usuario antes de iniciar la siguiente feature.
 | ID | Feature | Criterio principal de aceptación | Estado |
 |----|---------|-----------------------------------|--------|
 | F-001 | Andamiaje | 3 servicios con /health, frontend base MUI, lint (ruff), typecheck (tsc vía build), tests de ejemplo pasando, start-all.ps1 | hecha |
-| F-002 | Semilla de datos | seed.py carga el CSV BigBasket, crea usuarios demo y ~180 días de historial realista (ventas, compras, stock con los 4 estados) | pendiente |
+| F-002 | Semilla de datos | seed.py carga el CSV BigBasket, crea usuarios demo y ~180 días de historial realista (ventas, compras, stock con los 4 estados) | hecha |
 | F-003 | Servicio Auth | POST /auth/login emite JWT por rol, GET /auth/me valida token, util de RBAC compartida | pendiente |
 | F-004 | Inventario: catálogo y stock | GET /products con filtros dinámicos y estado calculado, umbrales editables (admin), alertas, movimientos, entrada manual | pendiente |
 | F-005 | Inventario: compras | proveedores + órdenes de compra (crear/modificar/enviar/cancelar/recibir); recibir suma stock y crea movimientos | pendiente |
