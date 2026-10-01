@@ -10,8 +10,10 @@ de negocio: solo estructura y verificación.
 ## Archivos afectados
 - Actualizar: .gitignore (añadir .venv/, __pycache__/, *.db, .pytest_cache/, .ruff_cache/,
   node_modules/, frontend/dist/)
-- Nuevos raíz: .env.example, pyproject.toml, requirements.txt, conftest.py, start-all.ps1,
+- Nuevos raíz: pyproject.toml, requirements.txt, start-all.ps1,
   data/.gitkeep
+  Nota: .env.example NO se crea (regla de permisos del entorno sobre archivos .env*);
+  las variables opcionales se documentan en AGENTS.md y la demo funciona con defaults.
 - Nuevo servicio auth: services/auth/requirements.txt, services/auth/src/auth/{__init__.py,
   main.py, config.py}, services/auth/tests/test_health.py
 - Nuevo servicio inventory: services/inventory/requirements.txt,
@@ -36,9 +38,11 @@ de negocio: solo estructura y verificación.
   httpx). Cada servicio además lleva su propio requirements.txt (historia de microservicio).
 
 ## Pasos atómicos
-1. Config raíz: actualizar .gitignore, crear .env.example, pyproject.toml (ruff
-   line-length=100, target py310; pytest testpaths=["services"]), requirements.txt raíz,
-   conftest.py (inserta los 3 services/*/src en sys.path), data/.gitkeep.
+1. Config raíz: actualizar .gitignore, pyproject.toml (ruff line-length=100, target
+   py310; pytest testpaths=["services"] y pythonpath con los 3 services/*/src para que
+   `import auth/inventory/sales` funcione en los tests), requirements.txt raíz,
+   data/.gitkeep. Variables de entorno documentadas en AGENTS.md (sin .env.example:
+   bloqueado por permisos del entorno sobre .env*).
 2. Servicio auth: estructura + main + config + test_health (GET /health → 200 status ok).
 3. Servicio inventory: ídem (SERVICE_NAME=inventory).
 4. Servicio sales: ídem (SERVICE_NAME=sales).

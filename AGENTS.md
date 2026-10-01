@@ -32,6 +32,9 @@ microservicios REST + frontend React. Prioridad: funcional, simple, demostrable.
 - UI en español. Moneda "$" genérico. Fechas ISO-8601. Paginación server-side (50/página).
 
 ## Comandos (PowerShell, desde la raíz)
+- Variables de entorno opcionales (todas con defaults en services/*/src/*/config.py, la
+  demo funciona sin .env): JWT_SECRET, AUTH_PORT, INVENTORY_PORT, SALES_PORT,
+  INVENTORY_URL, FRONTEND_URL.
 - Setup Python: python -m venv .venv ; .venv\Scripts\pip install -r requirements.txt
 - Setup frontend: cd frontend ; npm install
 - Lint: .venv\Scripts\ruff check services scripts
