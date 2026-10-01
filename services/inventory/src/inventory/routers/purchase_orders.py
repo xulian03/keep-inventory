@@ -9,6 +9,7 @@ from inventory.models import (
     Product,
     PurchaseOrder,
     PurchaseOrderItem,
+    StockMovement,
     Supplier,
 )
 from inventory.rbac import get_current_user, require_roles
@@ -264,3 +265,73 @@ def delete_purchase_order(
     ).delete()
     session.delete(order)
     session.commit()
+
+
+@router.post("/purchase-orders/{order_id}/send", response_model=PurchaseOrderDetail)
+def send_purchase_order(
+    order_id: int,
+    user: dict = Depends(require_roles("admin")),
+    session: Session = Depends(get_session),
+) -> PurchaseOrderDetail:
+    order = _get_order_or_404(session, order_id)
+    if order.status != "borrador":
+        raise HTTPException(
+            status_code=409, detail="Solo se puede enviar una orden en borrador"
+        )
+    order.status = "enviada"
+    session.commit()
+    session.refresh(order)
+    return _detail_out(session, order)
+
+
+@router.post("/purchase-orders/{order_id}/cancel", response_model=PurchaseOrderDetail)
+def cancel_purchase_order(
+    order_id: int,
+    user: dict = Depends(require_roles("admin")),
+    session: Session = Depends(get_session),
+) -> PurchaseOrderDetail:
+    order = _get_order_or_404(session, order_id)
+    if order.status != "enviada":
+        raise HTTPException(
+            status_code=409, detail="Solo se puede cancelar una orden enviada"
+        )
+    # Cancelar no toca el stock: sólo cambia el estado de la orden.
+    order.status = "cancelada"
+    session.commit()
+    session.refresh(order)
+    return _detail_out(session, order)
+
+
+@router.post("/purchase-orders/{order_id}/receive", response_model=PurchaseOrderDetail)
+def receive_purchase_order(
+    order_id: int,
+    user: dict = Depends(require_roles("empleado", "admin")),
+    session: Session = Depends(get_session),
+) -> PurchaseOrderDetail:
+    order = _get_order_or_404(session, order_id)
+    if order.status != "enviada":
+        raise HTTPException(
+            status_code=409, detail="Solo se puede recibir una orden enviada"
+        )
+
+    received_at = _now_iso()
+    for item in _items_of(session, order.id):
+        product = session.get(Product, item.product_id)
+        if product is None:
+            raise HTTPException(status_code=422, detail="Producto no encontrado")
+        product.stock += item.quantity
+        session.add(
+            StockMovement(
+                product_id=item.product_id,
+                movement_type="entrada",
+                quantity=item.quantity,
+                reason="compra",
+                reference=f"po:{order.id}",
+                created_at=received_at,
+            )
+        )
+    order.status = "recibida"
+    order.received_at = received_at
+    session.commit()
+    session.refresh(order)
+    return _detail_out(session, order)

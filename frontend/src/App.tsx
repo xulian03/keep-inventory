@@ -45,7 +45,7 @@ function App() {
                     KeepInventory
                   </Typography>
                   <Typography variant="body2" align="center" color="text.secondary">
-                    Login — llega en F-009
+                    Login — llega en F-007
                   </Typography>
                 </CardContent>
               </Card>
@@ -57,14 +57,14 @@ function App() {
           element={
             <PagePlaceholder
               title="Dashboard del Admin"
-              text="En construcción (F-010/F-011)"
+              text="En construcción (F-008/F-009)"
             />
           }
         />
         <Route
           path="/empleado"
           element={
-            <PagePlaceholder title="Panel del Empleado" text="En construcción (F-012)" />
+            <PagePlaceholder title="Panel del Empleado" text="En construcción (F-010)" />
           }
         />
       </Routes>

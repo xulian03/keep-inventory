@@ -114,6 +114,39 @@ class MovementCreateOut(BaseModel):
     stock: int
 
 
+class InternalSalidaItemIn(BaseModel):
+    product_id: int
+    quantity: int = Field(gt=0)
+
+
+class InternalSalidaCreate(BaseModel):
+    """Descuento por lote de una venta (POST /internal/movements/salida).
+
+    Se valida el lote completo antes de tocar el stock: duplicados → 422.
+    """
+
+    reference: str
+    items: list[InternalSalidaItemIn]
+
+    @model_validator(mode="after")
+    def _validar(self) -> "InternalSalidaCreate":
+        if not self.items:
+            raise ValueError("items no puede estar vacío")
+        product_ids = [item.product_id for item in self.items]
+        if len(product_ids) != len(set(product_ids)):
+            raise ValueError("items no puede tener product_id duplicados")
+        return self
+
+
+class InternalSalidaItemOut(BaseModel):
+    product_id: int
+    stock: int
+
+
+class InternalSalidaOut(BaseModel):
+    items: list[InternalSalidaItemOut]
+
+
 class PurchaseOrderItemIn(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)

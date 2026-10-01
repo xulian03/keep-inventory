@@ -30,7 +30,10 @@ microservicios REST + frontend React. Prioridad: funcional, simple, demostrable.
 - Una feature solo termina con: tests verdes, lint limpio, build de frontend OK (si aplica)
   y servicios arrancando.
 - Actualizar ROADMAP.md al cambiar el estado de cada feature.
-- UI en español. Moneda "$" genérico. Fechas ISO-8601. Paginación server-side (50/página).
+- UI en español, incluidos los VALORES de enum en API/BD (state, movement_type,
+  reason, status de orden: agotado/bajo/disponible/exceso, entrada/salida,
+  compra/ajuste/venta, borrador/enviada/recibida/cancelada). Moneda "$" genérico.
+  Fechas ISO-8601. Paginación server-side (50/página, máx 100).
 
 ## Comandos (PowerShell, desde la raíz)
 - Variables de entorno opcionales (todas con defaults en services/*/src/*/config.py, la

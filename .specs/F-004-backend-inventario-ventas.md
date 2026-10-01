@@ -4,6 +4,7 @@
 Routers de negocio de inventory (:8002) y sales (:8003) sobre los modelos existentes de F-002 (§4.2/§4.3, sin cambios) y la RBAC de F-003. Fusiona las antiguas F-004/F-005/F-006. Sin tablas nuevas ni cambios en seed.py. El state de stock no se almacena: se calcula (§7).
 
 ## Decisiones consultadas (2026-10-01)
+- Valores de enum en ESPAÑOL (state, movement_type, reason, status de orden): coherente con UI en español, semilla F-002 y ARCHITECTURE.md §4.2/§7. Sin migración.
 - Descuento por LOTE atómico: todo o nada; 409 si algún ítem no alcanza, sin descontar nada.
 - PATCH /products/{id} (admin, parcial): name (no vacío), sale_price (>0), market_price (≥0), is_active. GET /products: filtro is_active (default: todos); ids= ignora paginación (devuelve todas las coincidencias).
 - PATCH /purchase-orders/{id}: reemplazo completo de items + expected_date, solo borrador. DELETE /purchase-orders/{id}: 204 solo borrador (409 si no).
@@ -50,5 +51,3 @@ Routers de negocio de inventory (:8002) y sales (:8003) sobre los modelos existe
 - .venv\Scripts\ruff check services scripts ; .venv\Scripts\pytest -q
 - .\start-all.ps1 + smoke: login admin (PATCH umbral, PO→send→receive), login empleado (POST /sales de 2 ítems; GET /movements en :8002 muestra salidas reason=venta).
 
-## Pendiente de decisión (pausa 2026-10-01)
-- Idioma de los VALORES de enum (state, movement_type, reason, status de orden): hoy español, coherente con §4.2/§7 de ARCHITECTURE.md y con los datos ya sembrados por F-002. El usuario pregunta si deberían ser inglés. Si se cambia a inglés: migrar semilla + tests F-002, actualizar ARCHITECTURE.md y re-trabajar filtros de pasos 1-4. Decidir ANTES del paso 5.
