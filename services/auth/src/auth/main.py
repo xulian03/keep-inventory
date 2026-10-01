@@ -2,8 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from auth.config import FRONTEND_URL, SERVICE_NAME
+from auth.routers.auth import router as auth_router
 
 app = FastAPI(title=f"KeepInventory {SERVICE_NAME}")
+
+app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,
