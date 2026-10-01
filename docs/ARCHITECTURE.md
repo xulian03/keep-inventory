@@ -117,29 +117,32 @@ dataset: los simula la semilla (§11) sobre ~2000 "productos activos".
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
 | GET | /health | público | chequeo de vida |
-| GET | /products | autenticado | lista paginada; filtros: search (nombre/marca), ids (batch), category, subcategory, brand, supplier_id, state (agotado/bajo/disponible/exceso), page, page_size. Cada ítem incluye su state calculado |
-| GET | /products/{id} | autenticado | detalle con state |
+| GET | /products | autenticado | lista paginada; filtros: search (nombre/marca), ids (batch; ignora paginación y devuelve todas las coincidencias), category, subcategory, brand, supplier_id, state (agotado/bajo/disponible/exceso), is_active, page, page_size. Cada ítem incluye su state calculado |
+| GET | /products/{id} | autenticado | detalle con state y supplier_name |
+| PATCH | /products/{id} | admin | edición parcial: name, sale_price, market_price, is_active |
 | PATCH | /products/{id}/threshold | admin | ajusta min_threshold / excess_threshold |
 | GET | /categories | autenticado | categorías y subcategorías distintas (para filtros) |
 | GET | /suppliers | autenticado | proveedores |
 | GET | /alerts | autenticado | productos en estado bajo o agotado |
 | GET | /movements | autenticado | histórico de movimientos; filtros: product_id, movement_type, reason, date_from, date_to |
-| POST | /movements | empleado, admin | entrada manual o ajuste {product_id, movement_type, quantity>0, reason, reference} → actualiza stock |
+| POST | /movements | empleado, admin | entrada manual o ajuste {product_id, movement_type, quantity>0, reason ∈ {compra, ajuste}, reference?} → actualiza stock; 409 si el stock resultante < 0 |
 | POST | /purchase-orders | admin | crea orden borrador {supplier_id, expected_date, items:[{product_id, quantity, unit_cost}]} |
 | GET | /purchase-orders | autenticado | lista; filtros: status, supplier_id, date_from, date_to |
 | GET | /purchase-orders/{id} | autenticado | detalle con items |
-| PATCH | /purchase-orders/{id} | admin | modifica items/expected_date (solo si está en borrador) |
+| PATCH | /purchase-orders/{id} | admin | reemplaza items (lista completa) y modifica expected_date (solo si está en borrador) |
+| DELETE | /purchase-orders/{id} | admin | elimina la orden (solo si está en borrador) |
 | POST | /purchase-orders/{id}/send | admin | borrador → enviada |
 | POST | /purchase-orders/{id}/receive | empleado, admin | enviada → recibida: suma stock y crea movimientos entrada |
 | POST | /purchase-orders/{id}/cancel | admin | enviada → cancelada (sin efecto en stock) |
-| POST | /internal/movements/salida | interno (JWT) | descuenta stock por una venta; 409 si el stock es insuficiente |
+| POST | /internal/movements/salida | interno (JWT) | descuenta stock por una venta {reference, items:[...]}: UNA transacción, todo o nada; 409 si algún ítem no alcanza (sin descontar nada) |
 
 ### 5.3 Ventas y Analítica :8003
 | Método | Ruta | Rol | Descripción |
 |---|---|---|---|
 | GET | /health | público | chequeo de vida |
 | POST | /sales | empleado, admin | registra venta {items:[{product_id, quantity}]}: consulta precios en Inventario, descuenta stock vía REST interno y guarda la venta; 409 si algún producto no tiene stock suficiente |
-| GET | /sales | autenticado | histórico paginado; filtros: product_id, category, employee_id, date_from, date_to |
+| GET | /sales | autenticado | histórico paginado; filtros: product_id, category, employee_id, date_from, date_to; ítems embebidos en cada venta |
+| GET | /sales/{id} | autenticado | detalle de la venta con sus items |
 | GET | /analytics/kpis | admin | total vendido, nº transacciones, ticket promedio (período) + conteos de estado de stock y valor del inventario (consultados a Inventario por REST) |
 | GET | /analytics/sales-trend | admin | serie temporal de ventas; group_by=day/week/month; filtros date_from/date_to, category |
 | GET | /analytics/sales-by-category | admin | total por categoría en el período |
@@ -166,10 +169,8 @@ sequenceDiagram
     SA->>IN: GET /products?ids=... (precios, stock, nombre, categoría)
     IN-->>SA: catálogo de los ítems
     SA->>SA: valida cantidades (>0) y stock suficiente
-    loop cada ítem
-        SA->>IN: POST /internal/movements/salida (product_id, qty, JWT reenviado)
-        IN-->>SA: 200 (stock descontado) o 409 (sin stock)
-    end
+    SA->>IN: POST /internal/movements/salida (reference, items[], JWT reenviado)
+    IN-->>SA: 200 (todo descontado) o 409 (nada descontado)
     SA->>SA: guarda sale + sale_items (con datos denormalizados)
     SA-->>FE: 201 {venta, stock resultante}
 ```
