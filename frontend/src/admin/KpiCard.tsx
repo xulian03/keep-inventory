@@ -1,5 +1,5 @@
 import { Card, CardContent, Chip, Stack, Typography } from '@mui/material'
-import { formatPct } from './api'
+import { formatPct } from '../api/shared'
 
 export interface KpiCardProps {
   label: string

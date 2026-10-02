@@ -27,29 +27,19 @@ import { useAuth } from '../auth/AuthContext'
 import { chartColors } from '../theme'
 import FilterBar from './FilterBar'
 import KpiCard from './KpiCard'
+import { fetchCategories, formatMoney, STATE_COLORS, type InventoryState } from '../api/shared'
 import {
-  fetchCategories,
   fetchKpis,
   fetchPurchasesSummary,
   fetchSalesByCategory,
   fetchSalesTrend,
   fetchTopProducts,
-  formatMoney,
-  type InventoryState,
   type KpisResponse,
   type TrendGroupBy,
 } from './api'
 
 export interface ResumenPanelProps {
   onStateClick: (state: InventoryState) => void
-}
-
-// Colores del semáforo §7 (agotado/bajo/disponible/exceso).
-const STATE_COLORS: Record<InventoryState, string> = {
-  agotado: '#EF4444',
-  bajo: '#F59E0B',
-  disponible: '#10B981',
-  exceso: '#3B82F6',
 }
 
 const STATE_ORDER: InventoryState[] = ['agotado', 'bajo', 'disponible', 'exceso']

@@ -19,7 +19,8 @@ microservicios REST + frontend React. Prioridad: funcional, simple, demostrable.
 - services/<svc>/src/<paquete>/ : código del servicio (main.py, config.py, luego models/routers).
 - services/<svc>/tests/ : pytest con TestClient.
 - frontend/src/ : páginas (Login, Admin, Empleado), auth/ (AuthContext + useAuth),
-  components/ (AppLayout, RequireRole), api/, theme.ts.
+  components/ (AppLayout, RequireRole), api/ (client.ts + shared.ts: tipos/helpers
+  compartidos), admin/ y empleado/ (paneles por pestaña), theme.ts.
 - scripts/seed.py : semilla de datos (CSV BigBasket en data/ + historial simulado);
   scripts/tests/ : tests de la semilla (invariants de ledger y calibración).
 - .specs/F-XXX-*.md : specs por feature; fuente de verdad del trabajo.

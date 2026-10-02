@@ -1,25 +1,12 @@
-import { Card, CardContent, Typography } from '@mui/material'
 import AppLayout, { type AppLayoutTab } from '../components/AppLayout'
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          En construcción — F-009
-        </Typography>
-      </CardContent>
-    </Card>
-  )
-}
+import RegistrarVentaPanel from '../empleado/RegistrarVentaPanel'
+import RecibirMercanciaPanel from '../empleado/RecibirMercanciaPanel'
+import CatalogoPanel from '../empleado/CatalogoPanel'
 
 const tabs: AppLayoutTab[] = [
-  { label: 'Registrar venta', content: <Placeholder title="Registrar venta" /> },
-  { label: 'Recibir mercancía', content: <Placeholder title="Recibir mercancía" /> },
-  { label: 'Catálogo', content: <Placeholder title="Catálogo" /> },
+  { label: 'Registrar venta', content: <RegistrarVentaPanel /> },
+  { label: 'Recibir mercancía', content: <RecibirMercanciaPanel /> },
+  { label: 'Catálogo', content: <CatalogoPanel /> },
 ]
 
 export default function Empleado() {
