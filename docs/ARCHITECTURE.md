@@ -143,11 +143,11 @@ dataset: los simula la semilla (§11) sobre ~2000 "productos activos".
 | POST | /sales | empleado, admin | registra venta {items:[{product_id, quantity}]}: consulta precios en Inventario, descuenta stock vía REST interno y guarda la venta; 409 si algún producto no tiene stock suficiente |
 | GET | /sales | autenticado | histórico paginado; filtros: product_id, category, employee_id, date_from, date_to; ítems embebidos en cada venta |
 | GET | /sales/{id} | autenticado | detalle de la venta con sus items |
-| GET | /analytics/kpis | admin | total vendido, nº transacciones, ticket promedio (período) + conteos de estado de stock y valor del inventario (consultados a Inventario por REST) |
+| GET | /analytics/kpis | admin | del período (date_from/date_to, default últimos 30 días): total vendido, nº transacciones, ticket promedio y unidades + delta % vs período anterior; conteos de estado de stock y valor del inventario (Inventario por REST: GET /products?is_active=1) |
 | GET | /analytics/sales-trend | admin | serie temporal de ventas; group_by=day/week/month; filtros date_from/date_to, category |
 | GET | /analytics/sales-by-category | admin | total por categoría en el período |
 | GET | /analytics/top-products | admin | top productos por ingreso en el período |
-| GET | /analytics/purchases-summary | admin | compras por mes y proveedor (agrega las órdenes de Inventario por REST) |
+| GET | /analytics/purchases-summary | admin | por mes y proveedor: nº de órdenes y $ de las órdenes recibidas (date_from/date_to sobre received_at; default todas) + conteo total por estado (agrega GET /purchase-orders y GET /suppliers de Inventario por REST) |
 | GET | /predictions | admin | por producto (paginado, filtro por categoría): demanda diaria estimada, tendencia, fecha estimada de agotamiento, demanda proyectada a 30 días y reorden sugerido |
 
 ## 6. Flujos clave
@@ -201,18 +201,22 @@ Calculados en consulta (no se almacenan → siempre consistentes con los umbrale
 
 ## 8. Modelo de predicción
 
-Input: serie diaria de unidades vendidas por producto (últimos 120 días, sales.db).
+Input: serie diaria de unidades vendidas por producto (últimos 120 días de sales.db, ceros
+incluidos). Campos JSON en inglés (daily_demand, trend, stockout_date, demand_30d,
+suggested_reorder); valores de enums en español ('regresion'/'media_movil',
+'subiendo'/'estable'/'bajando').
 - Si el producto tiene ≥ 10 días con ventas: regresión lineal (sklearn LinearRegression)
-  y = m·d + b sobre el índice de día → demanda_diaria = media de la proyección de los
-  próximos 30 días (mínimo 0); tendencia = signo de m con banda muerta de ±5%.
-- Si no (baja rotación): media móvil simple de 30 días.
+  y = m·d + b sobre el índice de día → daily_demand = media de la proyección de los
+  próximos 30 días (mínimo 0); trend = signo de m con banda muerta |m|·30 ≤ 5% de la
+  media diaria histórica (crece/cae menos de 5% en un mes → 'estable').
+- Si no (baja rotación): media móvil simple de 30 días (ceros incluidos), trend 'estable'.
 
 Salidas por producto:
-- fecha_agotamiento = hoy + stock / demanda_diaria (solo si demanda > 0).
-- demanda_30d = demanda_diaria × 30 (proyección).
-- reorden_sugerido = max(0, redondear(demanda_30d + min_threshold − stock)).
+- stockout_date = hoy + stock / daily_demand (null si daily_demand = 0).
+- demand_30d = daily_demand × 30 (proyección).
+- suggested_reorder = max(0, redondear(demand_30d + min_threshold − stock)).
 
-Coste: se calcula por página de 50 productos y se cachea en memoria 10 min → <2 s.
+Coste: se calcula por página de 50 productos bajo demanda, sin caché (SQLite local) → <2 s.
 Limitaciones (transparencia para la sustentación): modelo univariado (no usa precio ni
 estacionalidad anual), entrenado con 180 días de historial simulado.
 
@@ -236,7 +240,7 @@ Inter, KPI = número grande + etiqueta + chip de variación, paleta de gráficas
 
 - Navegador estándar (SPA); dashboard pensado para desktop.
 - <2 s por consulta: SQLite local, agregaciones con GROUP BY en SQL, paginación
-  server-side (50 por página), predicciones paginadas y cacheadas.
+  server-side (50 por página), predicciones paginadas (cálculo directo, sin caché).
 - Separación estricta de responsabilidades: el frontend solo habla REST; cada servicio
   esconde su base de datos.
 - Demo local con start-all.ps1 (4 procesos). En producción: contenedores separados por

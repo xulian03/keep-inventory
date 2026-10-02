@@ -46,6 +46,9 @@ microservicios REST + frontend React. Prioridad: funcional, simple, demostrable.
 - Semilla (requiere CSV en data/): .venv\Scripts\python scripts\seed.py (recrea las
   3 BDs desde cero en la raíz; determinista salvo fechas relativas a hoy)
 - Levantar todo (abre 4 ventanas): .\start-all.ps1
+- Warm-up tras arrancar (este equipo encarece conexiones nuevas y la 1.ª ejecución de
+  sklearn con el AV): abre una vez el dashboard (o llama 1 vez a /analytics/kpis y
+  /predictions); después todo responde en centenas de ms.
 - Salud: Invoke-WebRequest http://localhost:8001/health (ídem :8002, :8003)
 
 ## Credenciales demo (creadas por la semilla)
