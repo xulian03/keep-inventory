@@ -1,17 +1,15 @@
 # F-011 paso 2: aprovisionamiento de las 2 VMs (backend y frontend) en un solo
-# playbook, con los hosts definidos inline por IP (sin inventario).
+# playbook, usando los grupos backend/frontend de ansible/inventory.ini.
 # Ejecutar desde WSL, en la raiz del repo:
-#   ansible-playbook ansible/deploy.yml
+#   ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ansible/inventory.ini ansible/deploy.yml
+# La variable de entorno es porque ansible.cfg se ignora si el repo esta bajo /mnt/c
+# (world-writable), de ahi el host_key_checking desactivado y el -i explicito.
 # Las VMs las crea Vagrant (Vagrantfile); Ansible solo las aprovisiona.
 
 - name: Desplegar el backend de KeepInventory
-  hosts: "192.168.56.10"
+  hosts: backend
   become: true
   vars:
-    ansible_user: vagrant
-    ansible_password: vagrant
-    ansible_become_password: vagrant
-    ansible_python_interpreter: /usr/bin/python3
     repo_root: "{{ playbook_dir }}/.."
     app_dir: /opt/keepinventory
     keepinventory_services:
@@ -117,13 +115,9 @@
       loop: "{{ keepinventory_services }}"
 
 - name: Desplegar el frontend de KeepInventory
-  hosts: "192.168.56.20"
+  hosts: frontend
   become: true
   vars:
-    ansible_user: vagrant
-    ansible_password: vagrant
-    ansible_become_password: vagrant
-    ansible_python_interpreter: /usr/bin/python3
     repo_root: "{{ playbook_dir }}/.."
     app_dir: /opt/keepinventory
   tasks:
@@ -177,6 +171,12 @@
         state: started
         enabled: true
 
+    - name: Crear el directorio del despliegue del frontend
+      ansible.builtin.file:
+        path: "{{ app_dir }}/frontend"
+        state: directory
+        mode: "0755"
+
     # Se copian solo las entradas necesarias del frontend (sin node_modules ni
     # dist locales, que npm ci / npm run build regeneran en la VM).
     - name: Copiar los ficheros de configuracion y el codigo del frontend
@@ -197,7 +197,7 @@
 
     - name: Instalar las dependencias del frontend
       ansible.builtin.command:
-        cmd: npm ci --ignore-scripts
+        cmd: npm ci
         chdir: "{{ app_dir }}/frontend"
 
     - name: Compilar el frontend

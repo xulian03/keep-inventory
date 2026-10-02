@@ -27,7 +27,7 @@ Windows por nombre de dominio.
    `vagrant up`. Esperar a que ambas queden `running` (`vagrant status`).
 3. Desde WSL, en la misma carpeta clonada, aprovisionar con Ansible (tarda:
    dependencias de Python incluido scikit-learn, y build de npm):
-   `ansible-playbook ansible/deploy.yml`
+   `ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ansible/inventory.ini ansible/deploy.yml`
 4. En Windows, como Administrador, mapear el dominio y abrir
    `http://keepinventory.local` en el navegador:
    `powershell -ExecutionPolicy Bypass -File scripts\add-hosts.ps1`
@@ -56,4 +56,7 @@ Invoke-RestMethod http://keepinventory.local/inventory/products -Headers @{Autho
 - Entrar a una VM a revisar: `vagrant ssh backend` o `vagrant ssh frontend`.
 - Apagar sin borrar: `vagrant halt`.
 - Las BDs se regeneran con la semilla si borras los `.db` en `/opt/keepinventory` y
-  re-corres el paso 3 (`ansible-playbook ansible/deploy.yml`).
+  re-corres el paso 3 (`ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ansible/inventory.ini ansible/deploy.yml`).
+- Si tras recrear las VMs sale "REMOTE HOST IDENTIFICATION HAS CHANGED", ejecutar
+  `ssh-keygen -R 192.168.56.10` y `ssh-keygen -R 192.168.56.20`, y recordar
+  `sudo apt install -y sshpass`.

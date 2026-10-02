@@ -7,10 +7,13 @@ frontend (nginx), acceso desde Windows vía http://keepinventory.local.
 ## Decisiones
 - VMs: backend 192.168.56.10 (2GB/2vCPU), frontend 192.168.56.20 (1GB/1vCPU),
   ubuntu/jammy64. Vagrant SOLO crea las VMs. Ansible corre desde WSL.
-- TODO Ansible en UN solo playbook: ansible/deploy.yml con 2 plays (hosts inline
-  por IP con ansible_user=vagrant, ansible_password/become_password=vagrant,
-  python3) + ansible/ansible.cfg (host_key_checking=False). Sin inventory,
-  sin playbooks separados, sin roles.
+- TODO Ansible en UN solo playbook: ansible/deploy.yml con 2 plays (hosts por
+  grupo backend/frontend) + ansible/inventory.ini (2 hosts con IP, credenciales
+  vagrant) + ansible/ansible.cfg (host_key_checking=False). Sin playbooks
+  separados ni roles. Comando (desde la raíz, en WSL):
+  ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ansible/inventory.ini ansible/deploy.yml
+  (el cfg se ignora si el repo está bajo /mnt/c por ser world-writable, de ahí
+  la variable de entorno y el -i explícito).
 - nginx: root=/opt/keepinventory/frontend/dist, reverse proxy /auth/*→:8001/*,
   /inventory/*→:8002/*, /sales/*→:8003/* (quita el primer segmento).
 - Frontend compilado en la VM con VITE_{AUTH,INVENTORY,SALES}_URL =
