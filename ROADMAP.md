@@ -11,7 +11,7 @@ revisión del usuario antes de iniciar la siguiente feature.
 | F-003 | Servicio Auth | POST /auth/login emite JWT por rol, GET /auth/me valida token, util de RBAC compartida | hecha |
 | F-004 | Backend: inventario (catálogo, stock, compras) y ventas | fusiona las antiguas F-004/F-005/F-006: GET /products con filtros dinámicos y estado calculado, edición parcial de producto y umbrales (admin), alertas, movimientos, órdenes de compra (crear/modificar/eliminar/enviar/cancelar/recibir; recibir suma stock y crea movimientos), POST /sales con descuento atómico por lote vía REST a inventory (409 si no alcanza) y GET /sales con filtros | hecha |
 | F-005 | Analítica y predicciones | unifica antiguas F-005/F-006: GET /analytics/kpis (rango con delta % vs período anterior), sales-trend (día/semana/mes), ventas por categoría, top productos, resumen de compras por mes/proveedor (solo recibidas, REST a inventory) y GET /predictions (regresión lineal sklearn + fallback media móvil: demanda diaria, tendencia, agotamiento estimado, demanda 30 días, reorden sugerido) | hecha |
-| F-006 | Frontend: login y ruteo | login funcional, redirect por rol, layout estilo Lightdash | pendiente |
+| F-006 | Frontend: login y ruteo | login funcional, redirect por rol, layout estilo Lightdash | hecha |
 | F-007 | Frontend admin: dashboard | KPIs + gráficas interactivas (filtros de fecha/categoría) + tabla semáforo de stock | pendiente |
 | F-008 | Frontend admin: decisión | tabla de predicciones, crear/modificar/enviar órdenes de compra, editar umbrales y productos | pendiente |
 | F-009 | Frontend empleado | registrar venta (descuenta stock en vivo), recibir mercancía, catálogo simple | pendiente |
