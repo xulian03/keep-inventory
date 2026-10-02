@@ -13,8 +13,8 @@ revisión del usuario antes de iniciar la siguiente feature.
 | F-005 | Analítica y predicciones | unifica antiguas F-005/F-006: GET /analytics/kpis (rango con delta % vs período anterior), sales-trend (día/semana/mes), ventas por categoría, top productos, resumen de compras por mes/proveedor (solo recibidas, REST a inventory) y GET /predictions (regresión lineal sklearn + fallback media móvil: demanda diaria, tendencia, agotamiento estimado, demanda 30 días, reorden sugerido) | hecha |
 | F-006 | Frontend: login y ruteo | login funcional, redirect por rol, layout estilo Lightdash | hecha |
 | F-007 | Frontend admin: dashboard | KPIs + gráficas interactivas (filtros de fecha/categoría) + tabla semáforo de stock | hecha |
-| F-008 | Frontend admin: decisión | tabla de predicciones, crear/modificar/enviar órdenes de compra, editar umbrales y productos | pendiente |
-| F-009 | Frontend empleado | registrar venta (descuenta stock en vivo), recibir mercancía, catálogo simple | pendiente |
+| F-008 | Frontend admin: decisión | tabla de predicciones, crear/modificar/enviar órdenes de compra, editar umbrales y productos | hecha |
+| F-009 | Frontend empleado | registrar venta (descuenta stock en vivo), recibir mercancía, catálogo simple | hecha |
 | F-010 | Cierre | README con pasos de demo, verificación end-to-end y pulido final | pendiente |
 
 ## Notas

@@ -1,7 +1,16 @@
 import { apiFetch, INVENTORY_URL, SALES_URL } from '../api/client'
+import {
+  withQuery,
+  type InventoryState,
+  type OrderStatus,
+  type Product,
+} from '../api/shared'
+import type {
+  PurchaseOrderDetail,
+  PurchaseOrdersResponse,
+  Sale,
+} from '../empleado/api'
 
-export type InventoryState = 'agotado' | 'bajo' | 'disponible' | 'exceso'
-export type OrderStatus = 'borrador' | 'enviada' | 'recibida' | 'cancelada'
 export type TrendGroupBy = 'day' | 'week' | 'month'
 
 export interface DateRangeParams {
@@ -93,53 +102,6 @@ export interface PurchasesSummaryResponse {
   }[]
 }
 
-// --- inventory :8002 (autenticado) ---
-
-export interface Product {
-  id: number
-  name: string
-  brand: string
-  category: string
-  subcategory: string
-  sale_price: number
-  stock: number
-  min_threshold: number
-  excess_threshold: number
-  state: InventoryState
-}
-
-export interface ProductsResponse {
-  items: Product[]
-  total: number
-  page: number
-  page_size: number
-}
-
-export interface ProductsParams {
-  search?: string
-  category?: string
-  state?: InventoryState
-  is_active?: number
-  page?: number
-  page_size?: number
-}
-
-export interface CategoriesResponse {
-  categories: string[]
-  subcategories: string[]
-}
-
-type QueryValue = string | number | boolean | undefined
-
-function withQuery(base: string, params: Record<string, QueryValue>): string {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') search.set(key, String(value))
-  }
-  const query = search.toString()
-  return query ? `${base}?${query}` : base
-}
-
 export function fetchKpis(
   token: string,
   params: DateRangeParams = {},
@@ -193,13 +155,45 @@ export function fetchPurchasesSummary(
   )
 }
 
-export function fetchProducts(
+// --- sales :8003 (admin): predicciones de demanda ---
+
+export type PredictionMethod = 'regresion' | 'media_movil'
+export type PredictionTrend = 'estable' | 'subiendo' | 'bajando'
+
+export interface Prediction {
+  product_id: number
+  product_name: string
+  category: string
+  stock: number
+  min_threshold: number
+  state: InventoryState
+  method: PredictionMethod
+  daily_demand: number
+  trend: PredictionTrend
+  stockout_date: string | null
+  demand_30d: number
+  suggested_reorder: number
+}
+
+export interface PredictionsResponse {
+  items: Prediction[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface PredictionsParams {
+  page?: number
+  page_size?: number
+  category?: string
+}
+
+export function fetchPredictions(
   token: string,
-  params: ProductsParams = {},
-): Promise<ProductsResponse> {
-  return apiFetch<ProductsResponse>(
-    withQuery(`${INVENTORY_URL}/products`, {
-      is_active: 1,
+  params: PredictionsParams = {},
+): Promise<PredictionsResponse> {
+  return apiFetch<PredictionsResponse>(
+    withQuery(`${SALES_URL}/predictions`, {
       page: 1,
       page_size: 50,
       ...params,
@@ -208,29 +202,193 @@ export function fetchProducts(
   )
 }
 
-export function fetchCategories(token: string): Promise<CategoriesResponse> {
-  return apiFetch<CategoriesResponse>(`${INVENTORY_URL}/categories`, { token })
+// --- sales :8003 (admin): ventas ---
+
+export interface SalesResponse {
+  items: Sale[]
+  total: number
+  page: number
+  page_size: number
 }
 
-// --- formato (es-ES, moneda "$" genérico) ---
-
-const moneyFmt = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
-
-const pctFmt = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-})
-
-export function formatMoney(value: number): string {
-  return `$${moneyFmt.format(value)}`
+export interface SalesParams extends DateRangeParams {
+  category?: string
+  page?: number
+  page_size?: number
 }
 
-export function formatPct(delta: number | null): string {
-  if (delta === null) return '—'
-  if (delta === 0) return `${pctFmt.format(0)} %`
-  const arrow = delta > 0 ? '▲' : '▼'
-  return `${arrow} ${pctFmt.format(Math.abs(delta))} %`
+export function fetchSales(
+  token: string,
+  params: SalesParams = {},
+): Promise<SalesResponse> {
+  return apiFetch<SalesResponse>(
+    withQuery(`${SALES_URL}/sales`, {
+      page: 1,
+      page_size: 50,
+      ...params,
+    }),
+    { token },
+  )
+}
+
+// --- inventory :8002 (admin): proveedores, productos y órdenes ---
+
+export interface Supplier {
+  id: number
+  name: string
+  contact_email: string
+  lead_time_days: number
+}
+
+export function fetchSuppliers(token: string): Promise<Supplier[]> {
+  return apiFetch<Supplier[]>(`${INVENTORY_URL}/suppliers`, { token })
+}
+
+export interface AdminProduct extends Product {
+  type: string
+  market_price: number
+  rating: number | null
+  supplier_id: number | null
+  created_at: string
+}
+
+export interface ProductPatch {
+  name?: string
+  sale_price?: number
+  market_price?: number
+  is_active?: boolean
+}
+
+export interface ThresholdPatch {
+  min_threshold?: number
+  excess_threshold?: number
+}
+
+export function patchProduct(
+  token: string,
+  id: number,
+  payload: ProductPatch,
+): Promise<AdminProduct> {
+  return apiFetch<AdminProduct>(`${INVENTORY_URL}/products/${id}`, {
+    method: 'PATCH',
+    body: payload,
+    token,
+  })
+}
+
+export function patchThreshold(
+  token: string,
+  id: number,
+  payload: ThresholdPatch,
+): Promise<AdminProduct> {
+  return apiFetch<AdminProduct>(
+    `${INVENTORY_URL}/products/${id}/threshold`,
+    { method: 'PATCH', body: payload, token },
+  )
+}
+
+export interface PurchaseOrderItemIn {
+  product_id: number
+  quantity: number
+  unit_cost: number
+}
+
+export interface PurchaseOrderCreate {
+  supplier_id: number
+  expected_date?: string
+  items: PurchaseOrderItemIn[]
+}
+
+export interface PurchaseOrderUpdate {
+  expected_date?: string
+  items?: PurchaseOrderItemIn[]
+}
+
+export interface PurchaseOrdersParams extends DateRangeParams {
+  status?: OrderStatus
+  supplier_id?: number
+  page?: number
+  page_size?: number
+}
+
+export function fetchPurchaseOrders(
+  token: string,
+  params: PurchaseOrdersParams = {},
+): Promise<PurchaseOrdersResponse> {
+  return apiFetch<PurchaseOrdersResponse>(
+    withQuery(`${INVENTORY_URL}/purchase-orders`, {
+      page: 1,
+      page_size: 50,
+      ...params,
+    }),
+    { token },
+  )
+}
+
+export function fetchPurchaseOrder(
+  token: string,
+  id: number,
+): Promise<PurchaseOrderDetail> {
+  return apiFetch<PurchaseOrderDetail>(
+    `${INVENTORY_URL}/purchase-orders/${id}`,
+    { token },
+  )
+}
+
+export function createPurchaseOrder(
+  token: string,
+  payload: PurchaseOrderCreate,
+): Promise<PurchaseOrderDetail> {
+  return apiFetch<PurchaseOrderDetail>(`${INVENTORY_URL}/purchase-orders`, {
+    method: 'POST',
+    body: payload,
+    token,
+  })
+}
+
+export function updatePurchaseOrder(
+  token: string,
+  id: number,
+  payload: PurchaseOrderUpdate,
+): Promise<PurchaseOrderDetail> {
+  return apiFetch<PurchaseOrderDetail>(
+    `${INVENTORY_URL}/purchase-orders/${id}`,
+    { method: 'PATCH', body: payload, token },
+  )
+}
+
+export async function deletePurchaseOrder(
+  token: string,
+  id: number,
+): Promise<void> {
+  try {
+    await apiFetch<unknown>(`${INVENTORY_URL}/purchase-orders/${id}`, {
+      method: 'DELETE',
+      token,
+    })
+  } catch (error) {
+    // El backend responde 204 sin cuerpo y apiFetch lo intenta parsear como JSON.
+    if (error instanceof SyntaxError) return
+    throw error
+  }
+}
+
+export function sendPurchaseOrder(
+  token: string,
+  id: number,
+): Promise<PurchaseOrderDetail> {
+  return apiFetch<PurchaseOrderDetail>(
+    `${INVENTORY_URL}/purchase-orders/${id}/send`,
+    { method: 'POST', token },
+  )
+}
+
+export function cancelPurchaseOrder(
+  token: string,
+  id: number,
+): Promise<PurchaseOrderDetail> {
+  return apiFetch<PurchaseOrderDetail>(
+    `${INVENTORY_URL}/purchase-orders/${id}/cancel`,
+    { method: 'POST', token },
+  )
 }

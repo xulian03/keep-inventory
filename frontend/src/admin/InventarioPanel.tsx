@@ -2,14 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
+  Snackbar,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material'
@@ -24,18 +32,12 @@ import {
   fetchCategories,
   fetchProducts,
   formatMoney,
+  STATE_COLORS,
   type InventoryState,
   type Product,
   type ProductsResponse,
-} from './api'
-
-// Colores del semáforo §7 (agotado/bajo/disponible/exceso).
-const STATE_COLORS: Record<InventoryState, string> = {
-  agotado: '#EF4444',
-  bajo: '#F59E0B',
-  disponible: '#10B981',
-  exceso: '#3B82F6',
-}
+} from '../api/shared'
+import { patchProduct, patchThreshold, type AdminProduct } from './api'
 
 const STATE_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'Todas' },
@@ -48,7 +50,8 @@ const STATE_OPTIONS: { value: string; label: string }[] = [
 const SEARCH_DEBOUNCE_MS = 300
 
 // El backend no soporta orden: todas las columnas quedan sin ordenación.
-const columns: GridColDef<Product>[] = [
+// La columna de acciones se añade dentro del componente (necesita handlers).
+const BASE_COLUMNS: GridColDef<Product>[] = [
   { field: 'id', headerName: 'ID', width: 80, sortable: false },
   { field: 'name', headerName: 'Producto', flex: 1, minWidth: 200, sortable: false },
   { field: 'category', headerName: 'Categoría', width: 170, sortable: false },
@@ -87,6 +90,21 @@ const columns: GridColDef<Product>[] = [
   },
 ]
 
+interface SnackbarState {
+  open: boolean
+  message: string
+  severity: 'success' | 'error'
+}
+
+function parseNumber(value: string): number {
+  return value.trim() === '' ? Number.NaN : Number(value)
+}
+
+function isNonNegativeInt(value: string): boolean {
+  const parsed = parseNumber(value)
+  return Number.isInteger(parsed) && parsed >= 0
+}
+
 export interface InventarioPanelProps {
   initialState?: string
 }
@@ -107,6 +125,30 @@ export default function InventarioPanel({ initialState }: InventarioPanelProps) 
   })
   const [categories, setCategories] = useState<string[]>([])
 
+  // Refresco forzado conservando filtros y página actuales.
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Diálogo de umbrales.
+  const [thresholdTarget, setThresholdTarget] = useState<Product | null>(null)
+  const [minThreshold, setMinThreshold] = useState('')
+  const [excessThreshold, setExcessThreshold] = useState('')
+
+  // Diálogo de producto (incluye market_price, no presente en Product).
+  const [productTarget, setProductTarget] = useState<AdminProduct | null>(null)
+  const [productName, setProductName] = useState('')
+  const [productSalePrice, setProductSalePrice] = useState('')
+  const [productMarketPrice, setProductMarketPrice] = useState('')
+  const [productActive, setProductActive] = useState(true)
+
+  const [saving, setSaving] = useState(false)
+  const [snackbar, setSnackbar] = useState<SnackbarState>({
+    open: false,
+    message: '',
+    severity: 'success',
+  })
+
+  const closeSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }))
+
   const [result, setResult] = useState<{
     key: string
     data: ProductsResponse | null
@@ -120,6 +162,7 @@ export default function InventarioPanel({ initialState }: InventarioPanelProps) 
         stateFilter,
         page: paginationModel.page,
         pageSize: paginationModel.pageSize,
+        refreshKey,
       })
     : ''
 
@@ -204,6 +247,119 @@ export default function InventarioPanel({ initialState }: InventarioPanelProps) 
   const handleSearchChange = (value: string) => {
     setSearchInput(value)
   }
+
+  const openThresholdDialog = (row: Product) => {
+    setThresholdTarget(row)
+    setMinThreshold(String(row.min_threshold))
+    setExcessThreshold(String(row.excess_threshold))
+  }
+
+  const closeThresholdDialog = () => {
+    if (saving) return
+    setThresholdTarget(null)
+  }
+
+  const thresholdValid =
+    isNonNegativeInt(minThreshold) && isNonNegativeInt(excessThreshold)
+
+  const handleSaveThreshold = async () => {
+    if (!token || !thresholdTarget || saving || !thresholdValid) return
+    setSaving(true)
+    try {
+      await patchThreshold(token, thresholdTarget.id, {
+        min_threshold: parseNumber(minThreshold),
+        excess_threshold: parseNumber(excessThreshold),
+      })
+      setSnackbar({
+        open: true,
+        message: `Umbrales de "${thresholdTarget.name}" actualizados`,
+        severity: 'success',
+      })
+      setThresholdTarget(null)
+      // Conserva filtros y página; el semáforo se recalcula al recargar.
+      setRefreshKey((key) => key + 1)
+    } catch (err: unknown) {
+      setSnackbar({
+        open: true,
+        message:
+          err instanceof Error ? err.message : 'No se pudieron guardar los umbrales',
+        severity: 'error',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openProductDialog = (row: AdminProduct) => {
+    setProductTarget(row)
+    setProductName(row.name)
+    setProductSalePrice(String(row.sale_price))
+    setProductMarketPrice(String(row.market_price))
+    setProductActive(row.is_active)
+  }
+
+  const closeProductDialog = () => {
+    if (saving) return
+    setProductTarget(null)
+  }
+
+  const productValid =
+    productName.trim() !== '' &&
+    parseNumber(productSalePrice) > 0 &&
+    parseNumber(productMarketPrice) >= 0
+
+  const handleSaveProduct = async () => {
+    if (!token || !productTarget || saving || !productValid) return
+    setSaving(true)
+    try {
+      await patchProduct(token, productTarget.id, {
+        name: productName.trim(),
+        sale_price: parseNumber(productSalePrice),
+        market_price: parseNumber(productMarketPrice),
+        is_active: productActive,
+      })
+      setSnackbar({
+        open: true,
+        message: `Producto "${productName.trim()}" actualizado`,
+        severity: 'success',
+      })
+      setProductTarget(null)
+      setRefreshKey((key) => key + 1)
+    } catch (err: unknown) {
+      setSnackbar({
+        open: true,
+        message:
+          err instanceof Error ? err.message : 'No se pudo guardar el producto',
+        severity: 'error',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const columns: GridColDef<Product>[] = [
+    ...BASE_COLUMNS,
+    {
+      field: 'actions',
+      headerName: 'Acciones',
+      width: 220,
+      sortable: false,
+      filterable: false,
+      renderCell: (params: GridRenderCellParams<Product>) => (
+        <Stack direction="row" spacing={0.5}>
+          <Button size="small" onClick={() => openThresholdDialog(params.row)}>
+            Editar umbral
+          </Button>
+          <Button
+            size="small"
+            onClick={() => openProductDialog(params.row as AdminProduct)}
+          >
+            Editar producto
+          </Button>
+        </Stack>
+      ),
+    },
+  ]
 
   return (
     <Stack spacing={3}>
@@ -294,6 +450,141 @@ export default function InventarioPanel({ initialState }: InventarioPanelProps) 
           </CardContent>
         </Card>
       )}
+
+      <Dialog
+        open={thresholdTarget !== null}
+        onClose={closeThresholdDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Editar umbral</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              label="Producto"
+              value={thresholdTarget?.name ?? ''}
+              size="small"
+              disabled
+              fullWidth
+            />
+            <TextField
+              label="Umbral mínimo"
+              type="number"
+              size="small"
+              value={minThreshold}
+              onChange={(event) => setMinThreshold(event.target.value)}
+              error={minThreshold !== '' && !isNonNegativeInt(minThreshold)}
+              slotProps={{ htmlInput: { min: 0, step: 1 } }}
+              fullWidth
+            />
+            <TextField
+              label="Umbral de exceso"
+              type="number"
+              size="small"
+              value={excessThreshold}
+              onChange={(event) => setExcessThreshold(event.target.value)}
+              error={excessThreshold !== '' && !isNonNegativeInt(excessThreshold)}
+              slotProps={{ htmlInput: { min: 0, step: 1 } }}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeThresholdDialog} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveThreshold}
+            disabled={saving || !thresholdValid}
+          >
+            {saving ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={productTarget !== null}
+        onClose={closeProductDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Editar producto</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              label="Nombre"
+              size="small"
+              value={productName}
+              onChange={(event) => setProductName(event.target.value)}
+              error={productName.trim() === ''}
+              fullWidth
+            />
+            <TextField
+              label="Precio de venta"
+              type="number"
+              size="small"
+              value={productSalePrice}
+              onChange={(event) => setProductSalePrice(event.target.value)}
+              error={
+                productSalePrice !== '' && !(parseNumber(productSalePrice) > 0)
+              }
+              slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+              fullWidth
+            />
+            <TextField
+              label="Precio de mercado"
+              type="number"
+              size="small"
+              value={productMarketPrice}
+              onChange={(event) => setProductMarketPrice(event.target.value)}
+              error={
+                productMarketPrice !== '' &&
+                !(parseNumber(productMarketPrice) >= 0)
+              }
+              slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+              fullWidth
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={productActive}
+                  onChange={(event) => setProductActive(event.target.checked)}
+                />
+              }
+              label="Activo"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeProductDialog} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveProduct}
+            disabled={saving || !productValid}
+          >
+            {saving ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={closeSnackbar}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   )
 }
