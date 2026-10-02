@@ -52,6 +52,10 @@ microservicios REST + frontend React. Prioridad: funcional, simple, demostrable.
   sklearn con el AV): abre una vez el dashboard (o llama 1 vez a /analytics/kpis y
   /predictions); después todo responde en centenas de ms.
 - Salud: Invoke-WebRequest http://localhost:8001/health (ídem :8002, :8003)
+- Despliegue en 2 VMs (VirtualBox+Vagrant; Ansible desde WSL): ver docs/DEPLOY.md.
+  Vagrantfile (backend 192.168.56.10, frontend/nginx 192.168.56.20) → vagrant up;
+  ansible-playbook ansible/deploy.yml (playbook único, hosts inline, usuario
+  vagrant); dominio keepinventory.local vía scripts\add-hosts.ps1 (admin).
 
 ## Credenciales demo (creadas por la semilla)
 - admin@tienda.com / admin123 (Dueño/Admin)

@@ -16,6 +16,7 @@ revisión del usuario antes de iniciar la siguiente feature.
 | F-008 | Frontend admin: decisión | tabla de predicciones, crear/modificar/enviar órdenes de compra, editar umbrales y productos | hecha |
 | F-009 | Frontend empleado | registrar venta (descuenta stock en vivo), recibir mercancía, catálogo simple | hecha |
 | F-010 | Cierre | README con pasos de demo, verificación end-to-end y pulido final | pendiente |
+| F-011 | Despliegue Vagrant+Ansible | 2 VMs VirtualBox (backend 192.168.56.10, frontend/nginx 192.168.56.20), playbook único ansible/deploy.yml desde WSL, dominio keepinventory.local con reverse proxy nginx y add-hosts.ps1 en el cliente Windows; docs/DEPLOY.md reproducible | hecha |
 
 ## Notas
 - Datos: catálogo completo BigBasket (~28K filas); ventas/stock/compras simulados solo para

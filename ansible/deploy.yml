@@ -1,0 +1,257 @@
+# F-011 paso 2: aprovisionamiento de las 2 VMs (backend y frontend) en un solo
+# playbook, con los hosts definidos inline por IP (sin inventario).
+# Ejecutar desde WSL, en la raiz del repo:
+#   ansible-playbook ansible/deploy.yml
+# Las VMs las crea Vagrant (Vagrantfile); Ansible solo las aprovisiona.
+
+- name: Desplegar el backend de KeepInventory
+  hosts: "192.168.56.10"
+  become: true
+  vars:
+    ansible_user: vagrant
+    ansible_password: vagrant
+    ansible_become_password: vagrant
+    ansible_python_interpreter: /usr/bin/python3
+    repo_root: "{{ playbook_dir }}/.."
+    app_dir: /opt/keepinventory
+    keepinventory_services:
+      - name: auth
+        port: 8001
+      - name: inventory
+        port: 8002
+      - name: sales
+        port: 8003
+  tasks:
+    - name: Instalar python3-venv y python3-pip
+      ansible.builtin.apt:
+        name:
+          - python3-venv
+          - python3-pip
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Crear los directorios del despliegue
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/scripts"
+        - "{{ app_dir }}/data"
+
+    - name: Copiar los microservicios
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/services/"
+        dest: "{{ app_dir }}/services/"
+
+    - name: Copiar requirements.txt
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/requirements.txt"
+        dest: "{{ app_dir }}/requirements.txt"
+
+    - name: Copiar el catalogo BigBasket
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/data/"
+        dest: "{{ app_dir }}/data/"
+
+    - name: Copiar el script de la semilla
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/scripts/seed.py"
+        dest: "{{ app_dir }}/scripts/seed.py"
+
+    - name: Crear el entorno virtual
+      ansible.builtin.command:
+        cmd: python3 -m venv {{ app_dir }}/venv
+        creates: "{{ app_dir }}/venv/bin/python"
+
+    - name: Instalar las dependencias en el entorno virtual
+      ansible.builtin.command:
+        cmd: "{{ app_dir }}/venv/bin/pip install -r {{ app_dir }}/requirements.txt"
+      environment:
+        PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+    # seed.py resuelve la raiz del repo como parent de scripts/ y crea las BDs
+    # segun AUTH_DB/INVENTORY_DB/SALES_DB (config.py de cada servicio). Con
+    # cwd=/opt/keepinventory y esas variables las BDs quedan en /opt/keepinventory,
+    # que es donde apuntan las units de systemd. `creates` la hace idempotente.
+    - name: Ejecutar la semilla
+      ansible.builtin.command:
+        cmd: "{{ app_dir }}/venv/bin/python {{ app_dir }}/scripts/seed.py"
+        chdir: "{{ app_dir }}"
+        creates: "{{ app_dir }}/auth.db"
+      environment:
+        AUTH_DB: "{{ app_dir }}/auth.db"
+        INVENTORY_DB: "{{ app_dir }}/inventory.db"
+        SALES_DB: "{{ app_dir }}/sales.db"
+
+    - name: Escribir las units systemd de los 3 servicios
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/keepinventory-{{ item.name }}.service"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=KeepInventory {{ item.name }} service
+          After=network.target
+
+          [Service]
+          WorkingDirectory={{ app_dir }}
+          Environment=FRONTEND_URL=http://keepinventory.local
+          Environment=AUTH_DB={{ app_dir }}/auth.db
+          Environment=INVENTORY_DB={{ app_dir }}/inventory.db
+          Environment=SALES_DB={{ app_dir }}/sales.db
+          ExecStart={{ app_dir }}/venv/bin/python -m uvicorn {{ item.name }}.main:app --app-dir {{ app_dir }}/services/{{ item.name }}/src --host 0.0.0.0 --port {{ item.port }}
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      loop: "{{ keepinventory_services }}"
+
+    - name: Habilitar y arrancar los servicios
+      ansible.builtin.systemd:
+        name: "keepinventory-{{ item.name }}.service"
+        daemon_reload: true
+        enabled: true
+        state: started
+      loop: "{{ keepinventory_services }}"
+
+- name: Desplegar el frontend de KeepInventory
+  hosts: "192.168.56.20"
+  become: true
+  vars:
+    ansible_user: vagrant
+    ansible_password: vagrant
+    ansible_become_password: vagrant
+    ansible_python_interpreter: /usr/bin/python3
+    repo_root: "{{ playbook_dir }}/.."
+    app_dir: /opt/keepinventory
+  tasks:
+    - name: Comprobar si ya existe el swapfile
+      ansible.builtin.stat:
+        path: /swapfile
+      register: swap_file
+
+    - name: Crear el swapfile de 2GB
+      ansible.builtin.command:
+        cmd: fallocate -l 2G /swapfile
+        creates: /swapfile
+
+    - name: Ajustar los permisos del swapfile
+      ansible.builtin.command:
+        cmd: chmod 600 /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Formatear el swapfile
+      ansible.builtin.command:
+        cmd: mkswap /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Activar el swapfile
+      ansible.builtin.command:
+        cmd: swapon /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Descargar el script de NodeSource (Node 20 LTS)
+      ansible.builtin.get_url:
+        url: https://deb.nodesource.com/setup_20.x
+        dest: /tmp/nodesource_setup.sh
+        mode: "0755"
+
+    - name: Registrar el repositorio de NodeSource
+      ansible.builtin.command:
+        cmd: bash /tmp/nodesource_setup.sh
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Instalar Node.js y nginx
+      ansible.builtin.apt:
+        name:
+          - nodejs
+          - nginx
+        state: present
+        update_cache: true
+
+    - name: Arrancar y habilitar nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+    # Se copian solo las entradas necesarias del frontend (sin node_modules ni
+    # dist locales, que npm ci / npm run build regeneran en la VM).
+    - name: Copiar los ficheros de configuracion y el codigo del frontend
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/frontend/{{ item }}"
+        dest: "{{ app_dir }}/frontend/{{ item }}"
+      loop:
+        - package.json
+        - package-lock.json
+        - index.html
+        - vite.config.ts
+        - tsconfig.json
+        - tsconfig.app.json
+        - tsconfig.node.json
+        - .oxlintrc.json
+        - src/
+        - public/
+
+    - name: Instalar las dependencias del frontend
+      ansible.builtin.command:
+        cmd: npm ci --ignore-scripts
+        chdir: "{{ app_dir }}/frontend"
+
+    - name: Compilar el frontend
+      ansible.builtin.command:
+        cmd: npm run build
+        chdir: "{{ app_dir }}/frontend"
+      environment:
+        VITE_AUTH_URL: http://keepinventory.local/auth
+        VITE_INVENTORY_URL: http://keepinventory.local/inventory
+        VITE_SALES_URL: http://keepinventory.local/sales
+
+    - name: Quitar el sitio por defecto de nginx (libera el default_server)
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Configurar el sitio de nginx
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/keepinventory
+        mode: "0644"
+        content: |
+          server {
+              listen 80;
+              server_name keepinventory.local;
+              root {{ app_dir }}/frontend/dist;
+              index index.html;
+
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+
+              location /auth/ {
+                  proxy_pass http://192.168.56.10:8001/;
+              }
+
+              location /inventory/ {
+                  proxy_pass http://192.168.56.10:8002/;
+              }
+
+              location /sales/ {
+                  proxy_pass http://192.168.56.10:8003/;
+              }
+          }
+      notify: Recargar nginx
+
+    - name: Habilitar el sitio de nginx
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/keepinventory
+        dest: /etc/nginx/sites-enabled/keepinventory
+        state: link
+      notify: Recargar nginx
+
+  handlers:
+    - name: Recargar nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
