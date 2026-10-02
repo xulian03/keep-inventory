@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AppBar,
@@ -20,6 +20,8 @@ export interface AppLayoutTab {
 
 interface AppLayoutProps {
   tabs: AppLayoutTab[]
+  value?: number
+  onIndexChange?: (index: number) => void
 }
 
 const roleLabels: Record<Role, string> = {
@@ -27,10 +29,18 @@ const roleLabels: Record<Role, string> = {
   empleado: 'Empleado/Vendedor',
 }
 
-export default function AppLayout({ tabs }: AppLayoutProps) {
+export default function AppLayout({ tabs, value, onIndexChange }: AppLayoutProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [index, setIndex] = useState(0)
+  const [internalIndex, setInternalIndex] = useState(0)
+
+  const isControlled = value !== undefined
+  const index = isControlled ? value : internalIndex
+
+  const handleIndexChange = (_event: SyntheticEvent, newIndex: number) => {
+    if (!isControlled) setInternalIndex(newIndex)
+    onIndexChange?.(newIndex)
+  }
 
   const handleLogout = () => {
     logout()
@@ -60,7 +70,7 @@ export default function AppLayout({ tabs }: AppLayoutProps) {
         <Container maxWidth="lg">
           <Tabs
             value={index}
-            onChange={(_event, value: number) => setIndex(value)}
+            onChange={handleIndexChange}
             variant="scrollable"
             scrollButtons="auto"
           >
